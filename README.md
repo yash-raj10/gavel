@@ -2,7 +2,7 @@
 
 **Ask your data once. Every agent remembers the answer.**
 
-Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/). Point it at a pile of connected records — support tickets, pull requests, anything with text and relationships between items — and ask it plain-English questions like *"which of these look risky?"*. It judges each record with a local AI model, saves every verdict into a shared graph, and reuses that memory forever: the next question, the next person, the next day, nobody re-does work that's already been done.
+Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/). Point it at a pile of connected records — support tickets, pull requests, anything with text and relationships between items — and ask it plain-English questions like *"which of these look risky?"*, *"which ones are bug reports?"*, *"which customers are happy with the latest release?"*, or *"which PRs touch the payments code?"*. It judges each record with a local AI model, saves every verdict into a shared graph, and reuses that memory forever: the next question, the next person, the next day, nobody re-does work that's already been done.
 
 **Jira is Gavel's first connector.** More are coming next — Linear, Intercom, and others — all following the same pattern: pull real records in, and everything downstream (judging, memory, aggregation) works unchanged.
 
@@ -22,6 +22,17 @@ Gavel is different on four counts, all backed by a real graph, not a cache:
 4. **Answers go stale on purpose.** Edit a ticket and its old verdict is invalidated automatically — the next question about it gets a fresh, correct answer instead of a stale one.
 
 Remove FalkorDB and none of this works — it becomes a single, forgettable AI call. That's the point: **the graph is the product**, not a cache bolted onto one.
+
+---
+
+## Why it's fast: no LLM in the judging loop
+
+Every single-record judgment in Gavel runs on **laya**, a small, open-source, zero-shot classification model — not a hosted LLM API. That's a deliberate architectural choice, not a cost-saving afterthought:
+
+- **~166ms per record, fully local, zero network round-trips.** No rate limits, no waiting on an API, no per-call latency spikes. Judged 41 real tickets end-to-end in under 7 seconds on a laptop.
+- **No tokens burned per judgment.** A full-fledged LLM call for every row, for every question, across thousands of records, gets expensive and slow fast. Laya runs the same yes/no judgment as a single forward pass, on CPU or GPU, for free, forever.
+- **The LLM budget goes where it actually matters: planning, not judging.** Gavel only spends an LLM call (Groq, or the chat client's own model) once per *goal*, to decide which questions to ask — the actual grunt work of judging hundreds or thousands of rows never touches it. That split is what makes Gavel viable at real scale instead of just a cute demo.
+- **Memory compounds the speed advantage.** Combine the sub-200ms judging with FalkorDB's memory layer, and most questions after the first one don't even need a fresh judgment at all — `ask_aggregate` answers in milliseconds with **zero model calls**, local or hosted.
 
 ---
 

@@ -1,6 +1,6 @@
 # Gavel
 
-**Ask your data once. Every agent remembers the answer.**
+**Judge once. Remember forever.**
 
 Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/). Point it at a pile of connected records — support tickets, pull requests, anything with text and relationships between items — and ask it plain-English questions like *"which of these look risky?"*, *"which ones are bug reports?"*, *"which customers are happy with the latest release?"*, or *"which PRs touch the payments code?"*. It judges each record with a local AI model, saves every verdict into a shared graph, and reuses that memory forever: the next question, the next person, the next day, nobody re-does work that's already been done.
 

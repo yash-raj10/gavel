@@ -6,7 +6,7 @@ Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/).
 
 **Jira is Gavel's first connector.** More are coming next — Linear, Intercom, and others — all following the same pattern: pull real records in, and everything downstream (judging, memory, aggregation) works unchanged.
 
-Built for FalkorDB's **Graph Hacks** hackathon — Track 2 (Agent Memory and Coordination).
+Built for FalkorDB's **Graph Hacks** hackathon — Track 2 (Agent Memory and Coordination) and Track 1 (Agents That Act on Connected Data).
 
 ---
 

@@ -8,6 +8,8 @@ Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/).
 
 Built for FalkorDB's **Graph Hacks** hackathon — Track 2 (Agent Memory and Coordination) and Track 1 (Agents That Act on Connected Data).
 
+**[Watch the demo video](https://www.youtube.com/watch?v=v7PWv-TG5fo)**
+
 ---
 
 ## Why this exists

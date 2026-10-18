@@ -6,7 +6,7 @@ Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/).
 
 **Jira is Gavel's first connector.** More are coming next — Linear, Intercom, and others — all following the same pattern: pull real records in, and everything downstream (judging, memory, aggregation) works unchanged.
 
-Built for FalkorDB's **Graph Hacks** hackathon — Track 2 (Agent Memory and Coordination), also fits Track 1 (Agents That Act on Connected Data).
+Built for FalkorDB's **Graph Hacks** hackathon — Track 2 (Agent Memory and Coordination).
 
 ---
 
@@ -164,6 +164,4 @@ Every behavior above — reuse, aggregation, the trail, staleness — depends on
 
 ## What's honest about the current scope
 
-- The judge model (`laya`) is zero-shot, not fine-tuned — it's accurate on records with explicit language ("I want to cancel", "I am furious") and less reliable on subtle implication. See `check_accuracy.py` for a real accuracy check against hand-labeled tickets (~88% on this dataset).
 - **Jira is the first connector we built.** Linear, Intercom, and others follow next, using the exact same loader pattern — not yet built, by design kept simple to add later.
-- `connect_jira` (used from chat) only reads credentials from `.env` — it never accepts a token as a chat argument, so secrets never land in chat history.

@@ -2,7 +2,9 @@
 
 **Ask your data once. Every agent remembers the answer.**
 
-Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/). Point it at a pile of support tickets — from a demo dataset, or your real Jira project — and ask it plain-English questions like *"which customers are about to cancel?"*. It judges each ticket with a local AI model, saves every verdict into a shared graph, and reuses that memory forever: the next question, the next agent, the next day, nobody re-does work that's already been done.
+Gavel is a judgment-memory agent built on [FalkorDB](https://www.falkordb.com/). Point it at a pile of connected records — support tickets, pull requests, anything with text and relationships between items — and ask it plain-English questions like *"which of these look risky?"*. It judges each record with a local AI model, saves every verdict into a shared graph, and reuses that memory forever: the next question, the next person, the next day, nobody re-does work that's already been done.
+
+**Jira is Gavel's first connector.** More are coming next — Linear, Intercom, and others — all following the same pattern: pull real records in, and everything downstream (judging, memory, aggregation) works unchanged.
 
 Built for FalkorDB's **Graph Hacks** hackathon — Track 2 (Agent Memory and Coordination), also fits Track 1 (Agents That Act on Connected Data).
 
@@ -25,34 +27,40 @@ Remove FalkorDB and none of this works — it becomes a single, forgettable AI c
 
 ## How it works, with a real example
 
-Say Aftershoot (a photo culling/editing tool for photographers) has a pile of support tickets from its studio customers. Three different moments, same graph:
+Say someone wants to know which of their customers are at risk of churning, based on their support tickets. One person, asking progressively deeper questions, same graph:
 
-**Step 1 — A triage agent asks: *"which tickets sound angry?"***
-Gavel has never seen this question. It takes every ticket currently in the graph, and for each one, calls **laya** (a small, local, zero-shot judgment model — not a hosted API) with the ticket text and the question. Laya returns a probability per ticket (e.g. ticket `cust-mo-t0`, "Culling is broken again" → `0.92`). Gavel writes one `Judgment` node per ticket into FalkorDB, linked to that ticket and to a new `Question` node, tagged with which agent asked and the ticket's current version.
+**Step 1 — they ask: *"which tickets sound angry?"***
+Gavel has never seen this question. It takes every ticket currently in the graph, and for each one, calls **laya** (a small, local, zero-shot judgment model — not a hosted API) with the ticket text and the question. Laya returns a probability per ticket (e.g. ticket `cust-mo-t0`, "Culling is broken again" → `0.92`). Gavel writes one `Judgment` node per ticket into FalkorDB, linked to that ticket and to a new `Question` node, tagged with who asked and the ticket's current version.
 
-**Step 2 — A retention agent asks a *different* question: *"which tickets sound like the customer wants to cancel?"***
+**Step 2 — they ask a *different* question: *"which tickets sound like the customer wants to cancel?"***
 This wasn't asked before, so it's not a cache hit. But Gavel embeds the new question and finds it's *related* (not identical) to the "angry" question from Step 1, via a vector similarity search over `Question` nodes. So instead of judging all tickets in a random order, it prioritizes the ones Step 1 already flagged as angry — those are statistically the likeliest to also be cancel-risks — then judges everything else too, so nothing is skipped. Fresh `Judgment` nodes get saved for this new question.
 
-**Step 3 — A manager agent asks: *"which accounts are at risk?"***
-This is where the aggregation happens, and **no AI model is called at all**. Gavel looks up the Step 2 question's already-saved judgments, walks `Account ← Customer ← Ticket ← Judgment` in the graph, and for each account takes its highest-risk ticket as the account's score. Answer comes back in milliseconds, fully explainable: *"Lens & Light Photography, 0.92 risk, because of ticket `cust-priya-t0` ('Please cancel my plan') from Priya Nair, judged by the retention agent."*
+**Step 3 — they ask: *"which accounts are at risk?"***
+This is where the aggregation happens, and **no AI model is called at all**. Gavel looks up the Step 2 question's already-saved judgments, walks `Account ← Customer ← Ticket ← Judgment` in the graph, and for each account takes its highest-risk ticket as the account's score. Answer comes back in milliseconds, fully explainable: *"Lens & Light Photography, 0.92 risk, because of ticket `cust-priya-t0` ('Please cancel my plan') from Priya Nair."*
 
 **Then:** if ticket `cust-priya-t0` gets resolved and its text is updated, its old judgment is immediately marked stale. The next time anyone asks a question that touches it, only *that one ticket* gets re-judged — everything else is still reused from memory.
 
 ### The "it's one shared graph, not a new one per question" part
 
-This is the actual point of using FalkorDB instead of a cache: **every one of these steps reads and writes the same graph.** There's no "triage's graph" and "manager's graph" — it's one universal, company-wide graph of judgments. Concretely:
+This is the actual point of using FalkorDB instead of a cache: **every one of these steps reads and writes the same graph.** There's no separate graph per question or per person asking — it's one universal, company-wide graph of judgments. Concretely:
 
 > Suppose an employee had already queried the graph last week — out of 1,000 tickets, 300 came back "angry," and that's saved. Next week, a manager asks "who's about to leave us?" Gavel doesn't start over or build a new graph for that question — it reuses what's already sitting there (the angry judgments, the account structure, everything), judges only the genuinely new angle, and combines it with what's already known. Every question any agent has ever asked becomes permanent, shared infrastructure for every question asked after it.
 
 That compounding effect is the whole idea — the more the graph gets used, the less work (and the less laya/LLM calls) every future question costs.
 
-### Bring your own real data: the Jira example
+### Your real data, via Jira — Gavel's first connector
 
-Everything above also works on real tickets, not just the demo dataset. `jira_sync.py` pulls issues from a real Jira Cloud project straight into the same graph shape — a Jira **project** becomes an `Account`, an issue's **reporter** becomes a `Customer`, and each **issue** becomes a `Ticket` (matched by issue key, so re-syncing never duplicates). Once synced, every step above runs identically — Gavel doesn't know or care whether a ticket came from the demo seed or from a live Jira board. That's deliberate: adding a new data source is just a new loader script; `app.py`, `agent.py`, `judge.py`, and `graph.py` never change.
+`jira_sync.py` pulls issues from a real Jira Cloud project straight into the graph — a Jira **project** becomes an `Account`, an issue's **reporter** becomes a `Customer`, and each **issue** becomes a `Ticket` (matched by issue key, so re-syncing never duplicates). Once synced, every step above runs identically on real tickets. Jira is the first connector we built; **Linear, Intercom, and others are planned next**, all following this same pattern.
+
+### Beyond tickets: any connected data works the same way
+
+Nothing in Gavel's logic is actually ticket-specific — a "record" can be anything with text and a relationship to something else. That's what makes adding a new connector just a new loader script, not a rewrite: `app.py`, `agent.py`, `judge.py`, and `graph.py` never change.
+
+For example, a future **repo connector** could pull in pull requests instead of tickets (PR → Author → Repository, instead of Ticket → Customer → Account). The exact same flow would apply: ask *"which open PRs look risky to merge?"*, Gavel judges each PR's diff/description with laya, remembers every verdict, and a later question like *"which repos have the most risky open PRs?"* aggregates them with zero new AI calls — same graph, same memory, just a different connector feeding it.
 
 ---
 
-## Three ways to use it
+## Two ways to use it
 
 ### 1. Command line (`agent.py`)
 A real planning agent — it doesn't run a fixed script. You give it a goal in plain English, and a free LLM (Groq) decides for itself which questions to ask and whether to aggregate them. Nothing about the questions is hardcoded.
@@ -69,10 +77,7 @@ No separate LLM key needed here — the chat's own model plans the steps. Once r
 /gavel find accounts at risk of cancelling
 ```
 
-If no data is loaded yet, Gavel notices and offers to load the demo dataset or pull your real Jira project — right there in the chat.
-
-### 3. Direct HTTP API (`app.py`)
-`POST /ask`, `POST /ask_aggregate`, `POST /tickets/{id}/update` — for wiring Gavel into your own tooling.
+If no data is loaded yet, Gavel notices and offers to connect your Jira project (or load a sample dataset) — right there in the chat.
 
 ---
 
@@ -87,15 +92,14 @@ pip install -r requirements.txt
 # 2. Configure
 cp .env.example .env
 # set GROQ_API_KEY (free, console.groq.com/keys) -- only needed for the CLI agent
-# optionally set JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN / JIRA_PROJECT_KEY
-# to use your own real Jira tickets instead of the demo dataset
+# set JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN / JIRA_PROJECT_KEY
+# to pull in your own real Jira tickets
 
 # 3. Start FalkorDB
 docker run -p 6379:6379 falkordb/falkordb
 
-# 4. Load data -- demo dataset, or your own Jira project
-python3 seed.py          # demo: 14 photography studios, 41 tickets
-# python3 jira_sync.py   # OR: pull real tickets from Jira
+# 4. Load your data from Jira
+python3 jira_sync.py
 
 # 5. Start the memory service
 uvicorn app:app --port 8000
@@ -103,6 +107,8 @@ uvicorn app:app --port 8000
 # 6. Ask it something
 python3 agent.py "find accounts at risk of cancelling"
 ```
+
+No Jira project handy? `python3 seed.py` loads our own custom dataset instead (what we used to build and test Gavel) — everything downstream works identically either way.
 
 **Using it inside Claude Code instead (no Groq key needed):**
 
@@ -123,9 +129,9 @@ Full setup details, the Jira field mapping, and every tool's exact behavior are 
 ## Architecture
 
 ```
-                 seed.py  ──┐                      ┌── agent.py (CLI, Groq-planned)
-                             ├──> FalkorDB ── graph.py + judge.py ──┤
-          jira_sync.py  ──┘                      └── mcp_server.py (MCP tools, used by /gavel or chat)
+       jira_sync.py (1st connector)  ──┐                 ┌── agent.py (CLI, Groq-planned)
+                                        ├──> FalkorDB ── graph.py + judge.py ──┤
+                           seed.py  ──┘                 └── mcp_server.py (MCP tools, used by /gavel or chat)
 ```
 
 | File | Role |
@@ -136,8 +142,8 @@ Full setup details, the Jira field mapping, and every tool's exact behavior are 
 | `app.py` | FastAPI service: `/ask`, `/ask_aggregate`, `/tickets/{id}/update` |
 | `agent.py` | CLI agent — LLM-planned (Groq) goals over the memory service |
 | `mcp_server.py` | Same logic, exposed as MCP tools for chat clients (`/gavel`) |
-| `seed.py` | Demo dataset loader (Aftershoot-themed photography studio tickets) |
-| `jira_sync.py` | Real-data loader — pulls a Jira Cloud project into the same graph shape |
+| `jira_sync.py` | **Gavel's first connector** — pulls a real Jira Cloud project into the graph |
+| `seed.py` | Loads our own custom dataset, used to build and test Gavel |
 
 ### Why FalkorDB specifically
 
@@ -147,6 +153,6 @@ Every behavior above — reuse, aggregation, the trail, staleness — depends on
 
 ## What's honest about the current scope
 
-- The judge model (`laya`) is zero-shot, not fine-tuned — it's accurate on tickets with explicit language ("I want to cancel", "I am furious") and less reliable on subtle implication. See `check_accuracy.py` for a real accuracy check against hand-labeled tickets (~88% on this dataset).
-- Jira is the only real external connector today; more (Linear, Zendesk, etc.) are a natural extension of the same loader pattern, not yet built.
+- The judge model (`laya`) is zero-shot, not fine-tuned — it's accurate on records with explicit language ("I want to cancel", "I am furious") and less reliable on subtle implication. See `check_accuracy.py` for a real accuracy check against hand-labeled tickets (~88% on this dataset).
+- **Jira is the first connector we built.** Linear, Intercom, and others follow next, using the exact same loader pattern — not yet built, by design kept simple to add later.
 - `connect_jira` (used from chat) only reads credentials from `.env` — it never accepts a token as a chat argument, so secrets never land in chat history.

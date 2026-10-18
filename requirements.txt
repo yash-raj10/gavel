@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+falkordb
+python-dotenv
+httpx
+numpy
+laya
+sentence-transformers
+mcp

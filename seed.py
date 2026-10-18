@@ -15,6 +15,8 @@ import os
 from dotenv import load_dotenv
 from falkordb import FalkorDB
 
+import graph
+
 load_dotenv()
 
 HOST = os.environ.get("FALKORDB_HOST", "localhost")
@@ -475,6 +477,9 @@ def seed():
         g.delete()
     except Exception:
         pass
+    # The wipe deletes the vector index too -- make sure it gets recreated
+    # on the next graph.py call instead of being assumed to still exist.
+    graph.reset_indexes()
 
     ticket_count = 0
     for account in ACCOUNTS:

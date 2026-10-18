@@ -45,6 +45,17 @@ def _get_graph():
     return g
 
 
+def reset_indexes() -> None:
+    """
+    Marks indexes as needing to be recreated. Must be called after anything
+    that wipes the graph (e.g. g.delete() in seed.py) -- a wipe deletes the
+    vector index along with everything else, but _indexes_ready would
+    otherwise still say it exists, and every later vector query would fail.
+    """
+    global _indexes_ready
+    _indexes_ready = False
+
+
 def _ensure_indexes(g):
     try:
         g.query(

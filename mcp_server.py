@@ -18,6 +18,9 @@ Without the slash command, plain chat also works:
 "using gavel, find accounts at risk of cancelling"
 """
 
+import sys
+
+import embeddings
 import graph
 import jira_sync
 import judge
@@ -162,5 +165,20 @@ def ask_aggregate(question: str) -> dict:
     return {"based_on_question": existing["text"], "accounts": results}
 
 
+def _prewarm() -> None:
+    """
+    Loads the judge and embedding models eagerly at startup instead of on
+    the first tool call. Without this, the first `ask` can take 7-10s
+    (downloading/loading laya + sentence-transformers) which can exceed an
+    MCP client's tool-call timeout and get reported as a failed connection
+    even though the call would have succeeded given more time.
+    """
+    print("Gavel: warming up judge and embedding models...", file=sys.stderr)
+    judge.judge_rows("warmup", {"warmup-row": "warmup text"})
+    embeddings.embed("warmup")
+    print("Gavel: ready.", file=sys.stderr)
+
+
 if __name__ == "__main__":
+    _prewarm()
     server.run()
